@@ -1,0 +1,18 @@
+# Changes here will be overwritten by Copier; NEVER EDIT MANUALLY
+_commit: v2.1.0
+_src_path: https://github.com/napari/napari-plugin-template
+display_name: FLIMAnalyzer
+email: epf7ch@virginia.edu
+full_name: Terry Luedtke
+github_repository_url: provide later
+github_username_or_organization: tluedtkeuva
+include_reader_plugin: true
+include_sample_data_plugin: false
+include_widget_plugin: true
+include_writer_plugin: true
+install_dependabot: true
+install_precommit: true
+license: MIT
+module_name: flimanalyzer_napari
+plugin_name: flimanalyzer-napari
+short_description: A plugin to load FLIM (.sdt/.asc) files and work with FLIMAnalayzer.
