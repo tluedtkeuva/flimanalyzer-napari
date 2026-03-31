@@ -1,9 +1,10 @@
 try:
     from ._version import version as __version__
 except ImportError:
-    __version__ = 'unknown'
+    __version__ = '0.0.1'
 
 
+from ._dataset import FLIMASCFile, FLIMSDTFile, FLIMSeries, FLIMSet
 from ._reader import napari_get_reader
 from ._widget import (
     ExampleQWidget,
@@ -21,4 +22,8 @@ __all__ = (
     'ImageThreshold',
     'threshold_autogenerate_widget',
     'threshold_magic_widget',
+    'FLIMASCFile',
+    'FLIMSDTFile',
+    'FLIMSet',
+    'FLIMSeries',
 )
