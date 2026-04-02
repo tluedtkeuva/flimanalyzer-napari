@@ -48,14 +48,11 @@ def napari_get_reader(path: str | list[str]):
         # so we are only going to look at the first file.
         opath = Path(path)
         log.debug(
-            'Checking if path %(opath)s: is a directory with .asc files for FLIM reader.',
-            {'opath': opath.absolute()},
+            'Checking if path %s: is a directory with .asc files for FLIM reader.',
+            opath.absolute(),
         )
-        log.debug('opath.is_dir(): %(opath)s', {'opath': opath.is_dir()})
-        log.debug(
-            "opath.glob('*.asc'): %(count)s",
-            {'count': len(list(opath.glob('*.asc')))},
-        )
+        log.debug('opath.is_dir(): %s', opath.is_dir())
+        log.debug("opath.glob('*.asc'): %s", len(list(opath.glob('*.asc'))))
         if opath.is_dir() and opath.glob('*.asc'):
             return reader_function
     else:
@@ -132,36 +129,29 @@ def reader_function(path: str | list[str]):
     # Assume channels and measures are consistent across time points,
     # so we can determine their dimensions from the first time point's data
     set1 = sets[0]
-    log.debug('Examining set 0: %(set1)s', {'set1': set1.keys()})
+    log.debug('Examining set 0: %s', set1.keys())
     channel_dim = len(set1['data'])
     log.debug(
-        'Examining set 0 channels: %(channels)s',
-        {'channels': set1['data'].keys()},
+        'Examining set 0 channels: %s',
+        set1['data'].keys(),
     )
     channel1 = next(iter(set1['data'].values()))
     measure_dim = len(channel1)
-    log.debug(
-        'Examining set 0 measures: %(measures)s', {'measures': channel1.keys()}
-    )
+    log.debug('Examining set 0 measures: %s', channel1.keys())
     data = np.zeros((time_dim, channel_dim, measure_dim, 1, 256, 256))
     for t, (time, timeData) in enumerate(seriesData.items()):
-        log.debug(
-            'Processing time point %(t)s with data %(timeData)s{timeData}',
-            {'t': t, 'timeData': timeData},
-        )
+        log.debug('Processing time point %s with data %s', t, timeData)
         for c, (channel, channelSet) in enumerate(timeData['data'].items()):
             for m, (measure, measureData) in enumerate(channelSet.items()):
                 log.debug(
-                    'Assigning data[%(t)s, %(c)s, %(m)s][%(time)s, %(channel)s, %(measure)s] => %(measureData)s',
-                    {
-                        't': t,
-                        'c': c,
-                        'm': m,
-                        'time': time,
-                        'channel': channel,
-                        'measure': measure,
-                        'measureData': measureData,
-                    },
+                    'Assigning data[%s, %s, %s][%s, %s, %s] => %s',
+                    t,
+                    c,
+                    m,
+                    time,
+                    channel,
+                    measure,
+                    measureData,
                 )
                 # TODO?: Convert t, c, m to the correct indices for the data array based on the structure of the sets and channels
                 # Maybe add "channel_index" and "measure_index" methods to the FileSet/FileSeries class to help with this?

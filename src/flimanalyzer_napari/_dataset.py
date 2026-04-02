@@ -55,15 +55,6 @@ from typing import Self
 import numpy as np
 
 log = logging.getLogger(__name__)
-if __name__ == '__main__':
-    import sys
-
-    logging.basicConfig(
-        stream=sys.stdout,
-        level=logging.DEBUG,
-        format='%(levelname)s %(message)s',
-    )
-    log.debug('Logger initialized for %(name)s', {'name': __name__})
 log.debug('Importing FLIM dataset classes from _dataset.py')
 log.warning(
     'This module is a work in progress. The API is not stable and may change without warning.'
@@ -224,8 +215,8 @@ class FLIMASCFile(FLIMFile):
             )
         else:
             log.debug(
-                'Filename %(path)s does not match expected pattern for FLIM ASC files.',
-                {'path': path.name},
+                'Filename %s does not match expected pattern for FLIM ASC files.',
+                path.name,
             )
             return None
 
@@ -289,9 +280,7 @@ class FLIMSDTFile(FLIMFile):
     def parsePath(
         cls, path, pathRegex=None, titleRegex=None
     ) -> 'FLIMSDTFile|None':
-        log.debug(
-            '%(name)s.parsePath %(path)s', {'name': cls.__name__, 'path': path}
-        )
+        log.debug('%s.parsePath %s', cls.__name__, path)
         if pathRegex is None:
             pathRegex = FLIMSDTFile.sdt_regex
         if titleRegex is None:
@@ -312,8 +301,8 @@ class FLIMSDTFile(FLIMFile):
             return FLIMSDTFile(path, title, seriesTitle, timecode, frequency)
         else:
             log.debug(
-                'Filename %(path)s does not match expected pattern for FLIM SDT files.',
-                {'path': path.name},
+                'Filename %s does not match expected pattern for FLIM SDT files.',
+                path.name,
             )
             return None
 
@@ -349,8 +338,8 @@ class FLIMSDTFile(FLIMFile):
                             sdt_data[key.strip()] = value.strip()
                         else:
                             log.warning(
-                                'Invalid line in identification section: %(line)s',
-                                {'line': line.strip()},
+                                'Invalid line in identification section: %s',
+                                line.strip(),
                             )
                         continue
 
@@ -366,8 +355,8 @@ class FLIMSDTFile(FLIMFile):
                         continue
         except FileNotFoundError:
             log.error(
-                "Error: The file '%(file_path)s' was not found.",
-                {'file_path': file_path},
+                "Error: The file '%s' was not found.",
+                file_path,
             )
             # for Napari, should we rethrow the error?
 
@@ -422,11 +411,9 @@ class FLIMSet:
             if file.measure in channel:
                 # TODO: Should this be an exception?
                 log.warning(
-                    'File %(file_title)s has the same channel and measure as %(channel_title)s',
-                    {
-                        'file_title': file.title,
-                        'channel_title': channel[file.measure].title,
-                    },
+                    'File %s has the same channel and measure as %s',
+                    file.title,
+                    channel[file.measure].title,
                 )
             channel[file.measure] = file
 
@@ -567,8 +554,8 @@ class FLIMSeries:
                     title['sdt'] = flimfile
                 else:
                     log.info(
-                        'Skipping file %(path)s because it is not an ASC or SDT file.',
-                        {'path': path},
+                        'Skipping file %s because it is not an ASC or SDT file.',
+                        path,
                     )
 
         # Convert to FileSet objects
@@ -577,14 +564,15 @@ class FLIMSeries:
             sets = []
             for title, data in setData.items():
                 log.debug(
-                    'Creating FileSet for %(title)s\n%(data)s',
-                    {'title': title, 'data': data},
+                    'Creating FileSet for %s\n%s',
+                    title,
+                    data,
                 )
                 files = data.get('files', [])
                 sdt = data.get('sdt', None)
                 assert sdt or files, (
-                    'FileSet %(title)s has neither files nor sdt file.',
-                    {'title': title},
+                    'FileSet %s has neither files nor sdt file.',
+                    title,
                 )
                 fileset = FLIMSet(
                     files=files,
@@ -595,8 +583,8 @@ class FLIMSeries:
                 sets.append(fileset)
             if seriesTitle in allSeries:
                 log.warning(
-                    'Series %(seriesTitle)s already exists. Overwriting.',
-                    {'seriesTitle': seriesTitle},
+                    'Series %s already exists. Overwriting.',
+                    seriesTitle,
                 )
             allSeries[seriesTitle] = FLIMSeries(sets)
 
@@ -714,8 +702,8 @@ if __name__ == '__main__':
                         sdt_data[key.strip()] = value.strip()
                     else:
                         log.warning(
-                            'Invalid line in identification section: %(line)s',
-                            {'line': line.strip()},
+                            'Invalid line in identification section: %s',
+                            line.strip(),
                         )
                     continue
 
