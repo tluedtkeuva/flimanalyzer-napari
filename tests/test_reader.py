@@ -13,7 +13,7 @@ def test_reader(tmp_path):
     """An example of how you might test your plugin."""
     log.debug(
         'Checking if path %s: is a directory with .asc files for FLIM reader.',
-        tmp_path.absolute(),
+        tmp_path,
     )
     # # write some fake data using your supported file format
     # # we make the array an integer type to be compatible with the reader
@@ -38,6 +38,7 @@ def test_reader(tmp_path):
 
 
 def test_get_reader_pass(tmp_path):
+
     reader = napari_get_reader('fake.file')
     print(f'reader: {reader}')
     assert reader is None
@@ -59,10 +60,13 @@ def create_files(datadir: Path):
     # 3 time points, including the ctrl, 2 channels and 4 measures
     # 3 * 2 * 4 = 24 files
     # and 3 .sdt files
-    array_size = 12
+    array_size = 256
+
+    # These values should be sorted as we expect the reader to load them
+    # so that the images have the right marks.
     times = ('ctrl', 't10', 't200')
-    channels = ('ch1', 'ch2')
-    measures = ('chi', 'a1', 'a1[%]', 'a2')
+    channels = ('Ch1', 'Ch2')
+    measures = ('a1', 'a1[%]', 'a2', 'chi')
 
     # Ensure the directory exists
     datadir.mkdir(exist_ok=True)
@@ -75,8 +79,10 @@ def create_files(datadir: Path):
     # r2l = np.fliplr(l2r.copy())
     t2b = np.rot90(l2r.copy(), 3)
     # b2t = np.flipud(t2b.copy())
-    ch1 = l2r
-    ch2 = t2b
+    channel_bases = {
+        channels[0]: l2r,
+        channels[1]: t2b,
+    }
 
     def mark_measure(a: np.ndarray, measure: int):
         if measure == 0:
@@ -93,9 +99,9 @@ def create_files(datadir: Path):
     def mark_time(a: np.ndarray, time: int):
         if time == 0:
             return a.copy()
-        width = 2
+        width = 8
         cp = np.copy(a)
-        offset = int((time - 1) * width) + 1
+        offset = int((time - 1) * width) + width
         cp[:, offset : offset + width] = 1
         return cp
 
@@ -108,7 +114,13 @@ def create_files(datadir: Path):
         for _j, channel in enumerate(channels):
             for k, measure in enumerate(measures):
                 array = mark_time(
-                    mark_measure(ch1 if channel == 'ch1' else ch2, k), i
+                    mark_measure(
+                        channel_bases.get(
+                            channel, np.zeros((array_size, array_size))
+                        ),
+                        k,
+                    ),
+                    i,
                 )
                 np.savetxt(
                     datadir / f'{title}-{channel}-_{measure}.asc',
@@ -126,5 +138,6 @@ def create_files(datadir: Path):
 
 
 if __name__ == '__main__':
-    test_get_reader_pass('/tmp')
-    test_reader('/tmp')
+    create_files(Path('ascdir'))
+    # test_get_reader_pass('/tmp')
+    # test_reader('/tmp')

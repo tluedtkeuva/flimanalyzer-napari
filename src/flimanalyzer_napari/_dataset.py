@@ -50,7 +50,7 @@ import re
 import textwrap
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Self
+from typing import cast
 
 import numpy as np
 
@@ -145,17 +145,25 @@ class FLIMFile(ABC):
         )
 
     def __eq__(self, other) -> bool:
+        if not isinstance(other, FLIMFile):
+            return NotImplemented
         return self._path == other.path
 
     def __repr__(self) -> str:
-        return repr(self._path) if self._path else self._path
+        return (
+            f'{self.__class__.__name__}: {repr(self._path)}'
+            if self._path
+            else self._path
+        )
 
 
 class FLIMASCFile(FLIMFile):
     #
     # Class level defaults specific to ASC
     #
-    measures = ['photons', 'chi', 'a2[%]', 'a1[%]', 'a2', 'a1', 't2', 't1']
+    measures = sorted(
+        ['photons', 'chi', 'a2[%]', 'a1[%]', 'a2', 'a1', 't2', 't1']
+    )
     measures_re = re.compile(
         '(?P<measure>'
         + '|'.join(map(re.escape, sorted(measures, key=len, reverse=True)))
@@ -233,9 +241,12 @@ class FLIMASCFile(FLIMFile):
 
     # TODO: implement lt and eq for sorting (time/channel/measure order)
     #       Does this break equality? Consider same filename in different directory!
-    def __lt__(self, other: Self) -> bool:
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, FLIMASCFile):
+            return NotImplemented
+
         # Compare directory, seriesTitle, timecode, frequency, and if exists, channel, measure
-        return (
+        if (
             self._path.parent < other._path.parent
             or self._seriesTitle < other._seriesTitle
             or (
@@ -248,7 +259,14 @@ class FLIMASCFile(FLIMFile):
                 and other._frequency is not None
                 and self._frequency < other._frequency
             )
-            or (
+        ):
+            return True
+
+        if isinstance(other, FLIMSDTFile):
+            return False  # ASC files should come after matching SDT file
+
+        if (  # noqa: SIM103
+            (
                 self._channel is not None
                 and other._channel is not None
                 and self._channel < other._channel
@@ -259,7 +277,10 @@ class FLIMASCFile(FLIMFile):
                 and self._measure < other._measure
             )
             or self.path.name < other.path.name
-        )
+        ):
+            return True
+
+        return False
 
 
 class FLIMSDTFile(FLIMFile):
@@ -362,8 +383,31 @@ class FLIMSDTFile(FLIMFile):
 
         return sdt_data
 
-    # def __str__ (self):
-    #     return f"FLIMSDTFile(seriesTitle={self.seriesTitle}, sets={self.sets})"
+    def __lt__(self, other) -> bool:
+        if not isinstance(other, FLIMFile):
+            return NotImplemented
+
+        # Compare directory, seriesTitle, timecode, frequency, and if exists, channel, measure
+        if (
+            self._path.parent < other._path.parent
+            or self._seriesTitle < other._seriesTitle
+            or (
+                self._timecode is not None
+                and other._timecode is not None
+                and self._timecode < other._timecode
+            )
+            or (
+                self._frequency is not None
+                and other._frequency is not None
+                and self._frequency < other._frequency
+            )
+        ):
+            return True
+
+        if isinstance(other, FLIMASCFile):  # noqa: SIM103
+            return True  # ASC files should come after matching SDT file
+
+        return False
 
 
 class FLIMSet:
@@ -381,11 +425,16 @@ class FLIMSet:
     #
     def __init__(
         self,
-        files,
-        sdt=None,
-        ignore_missing_files=False,
-        ignore_missing_sdt=False,
+        files: list[FLIMASCFile],
+        sdt: FLIMSDTFile | None = None,
+        ignore_missing_files: bool = False,
+        ignore_missing_sdt: bool = False,
     ):
+        # log.debug(
+        #     'Creating FLIMSet with files: %s and sdt: %s',
+        #     files,
+        #     sdt,
+        # )
         self._ignore_missing_files = ignore_missing_files
         self._ignore_missing_sdt = ignore_missing_sdt
         self._sdt = sdt
@@ -401,10 +450,14 @@ class FLIMSet:
         self._seriesTitle = keyfile.seriesTitle
         self._timecode = keyfile.timecode
         self._frequency = keyfile.frequency
+        self._allFiles = cast(list[FLIMFile], files.copy())
+        if sdt is not None:
+            self._allFiles.append(sdt)
 
         self._channels = {}
 
         for file in files:
+            log.debug('Adding file: %s', file)
             if file.channel not in self._channels:
                 self._channels[file.channel] = {}
             channel = self._channels[file.channel]
@@ -416,6 +469,12 @@ class FLIMSet:
                     channel[file.measure].title,
                 )
             channel[file.measure] = file
+
+        # sort files, channels and measures
+        self._allFiles.sort()
+        self._channels = dict(sorted(self._channels.items()))
+        for key, value in self._channels.items():
+            self._channels[key] = dict(sorted(value.items()))
 
         # TODO: add checks for missing files and missing sdt file.
         if not self._ignore_missing_files:
@@ -481,6 +540,18 @@ class FLIMSet:
     def sdt(self):
         return self._sdt
 
+    def __lt__(self, other):
+        if not isinstance(other, FLIMSet):
+            return NotImplemented
+
+        return self._allFiles < other._allFiles
+
+    def __eq__(self, other):
+        if not isinstance(other, FLIMSet):
+            return NotImplemented
+
+        return self._allFiles == other._allFiles
+
     def __repr__(self) -> str:
         s = f'FLIMSet: title={self.title}, timecode={self.timecode}, frequency={self.frequency}\n'
         s += f'  SDT: {self._sdt}\n'
@@ -502,7 +573,7 @@ class FLIMSeries:
     # e.g. "a-t80_800_" and "a-t100_800_.asc" would both be associated with the same series.
 
     def __init__(self, sets: list[FLIMSet]):
-        self._sets = sets
+        self._sets = sorted(sets)
         if len(sets) == 0:
             self._seriesTitle = None
         else:

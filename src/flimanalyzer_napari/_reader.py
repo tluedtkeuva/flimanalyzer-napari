@@ -11,7 +11,7 @@ from pathlib import Path
 
 import numpy as np
 
-from flimanalyzer_napari._dataset import FLIMSeries
+from flimanalyzer_napari import FLIMSeries
 
 log = logging.getLogger(__name__)
 if __name__ == '__main__':
