@@ -142,7 +142,7 @@ def reader_function(path: str | list[str]):
     log.debug('Examining set 0 measures: %s', channel1.keys())
     data = np.zeros((time_dim, channel_dim, measure_dim, 1, 256, 256))
     for t, (time, timeData) in enumerate(seriesData.items()):
-        log.debug('Processing time point %s with data %s', t, timeData)
+        log.warning('Processing time point %s with data %s', t, timeData)
         for c, (channel, channelSet) in enumerate(timeData['data'].items()):
             log.debug('Processing channel %s with data %s', c, channelSet)
             for m, (measure, measureData) in enumerate(channelSet.items()):

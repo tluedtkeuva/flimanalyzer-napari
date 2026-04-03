@@ -100,9 +100,11 @@ def create_files(datadir: Path):
         if time == 0:
             return a.copy()
         width = 8
+        gap = width // 2
         cp = np.copy(a)
-        offset = int((time - 1) * width) + width
-        cp[:, offset : offset + width] = 1
+        for t in range(time):
+            offset = gap + int(t * (width + gap))
+            cp[:, offset : offset + width] = 1
         return cp
 
     # create the files

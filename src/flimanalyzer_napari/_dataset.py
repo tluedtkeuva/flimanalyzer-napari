@@ -104,6 +104,30 @@ class FLIMFile(ABC):
     def load(self) -> object:
         pass
 
+    @staticmethod
+    def timecode_value(timecode: str) -> int | str | None:
+        if timecode is None:
+            return None
+
+        if timecode == 'ctrl':
+            return -1
+
+        # match most common timecode format of t10, t20, etc.
+        if timecode.startswith('t'):
+            return int(timecode[1:])
+
+        # match leading or trailing digits
+        r = re.match(r'^(\d+)', timecode)
+        if r:
+            return int(r.group(1))
+
+        r = re.match(r'(\d+)$', timecode)
+        if r:
+            return int(r.group(1))
+
+        log.warning('Could not parse timecode: %s', timecode)
+        return timecode
+
     @property
     def path(self) -> Path:
         return self._path
@@ -127,22 +151,24 @@ class FLIMFile(ABC):
     # TODO: implement lt and eq for sorting (time/channel/measure order)
     #       Does this break equality? Consider same filename in different directory!
     def __lt__(self, other) -> bool:
-        # Compare directory, seriesTitle, timecode, frequency, and if exists, channel, measure
-        return (
-            self._path.parent < other._path.parent
-            or self._seriesTitle < other._seriesTitle
-            or (
-                self._timecode is not None
-                and other._timecode is not None
-                and self._timecode < other._timecode
-            )
-            or (
-                self._frequency is not None
-                and other._frequency is not None
-                and self._frequency < other._frequency
-            )
-            or self.path.name < other.path.name
+        if not isinstance(other, FLIMFile):
+            return NotImplemented
+        # Compare using tuple for lexicographical order, treating None as empty string for sorting
+        self_tuple = (
+            self._path.parent,
+            self._seriesTitle or '',
+            self.timecode_value(self._timecode) if self._timecode else '',
+            self._frequency or '',
+            self.path.name,
         )
+        other_tuple = (
+            other._path.parent,
+            other._seriesTitle or '',
+            other.timecode_value(other._timecode) if other._timecode else '',
+            other._frequency or '',
+            other.path.name,
+        )
+        return self_tuple < other_tuple
 
     def __eq__(self, other) -> bool:
         if not isinstance(other, FLIMFile):
@@ -245,20 +271,17 @@ class FLIMASCFile(FLIMFile):
         if not isinstance(other, FLIMASCFile):
             return NotImplemented
 
-        # Compare directory, seriesTitle, timecode, frequency, and if exists, channel, measure
+        # Compare using tuple for lexicographical order, treating None as empty string for sorting
         if (
-            self._path.parent < other._path.parent
-            or self._seriesTitle < other._seriesTitle
-            or (
-                self._timecode is not None
-                and other._timecode is not None
-                and self._timecode < other._timecode
-            )
-            or (
-                self._frequency is not None
-                and other._frequency is not None
-                and self._frequency < other._frequency
-            )
+            self._path.parent,
+            self._seriesTitle or '',
+            self.timecode_value(self._timecode) if self._timecode else '',
+            self._frequency or '',
+        ) < (
+            other._path.parent,
+            other._seriesTitle or '',
+            other.timecode_value(other._timecode) if other._timecode else '',
+            other._frequency or '',
         ):
             return True
 
@@ -266,18 +289,10 @@ class FLIMASCFile(FLIMFile):
             return False  # ASC files should come after matching SDT file
 
         if (  # noqa: SIM103
-            (
-                self._channel is not None
-                and other._channel is not None
-                and self._channel < other._channel
-            )
-            or (
-                self._measure is not None
-                and other._measure is not None
-                and self._measure < other._measure
-            )
-            or self.path.name < other.path.name
-        ):
+            self._channel or '',
+            self._measure or '',
+            self.path.name,
+        ) < (other._channel or '', other._measure or '', other.path.name):
             return True
 
         return False
@@ -387,20 +402,17 @@ class FLIMSDTFile(FLIMFile):
         if not isinstance(other, FLIMFile):
             return NotImplemented
 
-        # Compare directory, seriesTitle, timecode, frequency, and if exists, channel, measure
+        # Compare using tuple for lexicographical order, treating None as empty string for sorting
         if (
-            self._path.parent < other._path.parent
-            or self._seriesTitle < other._seriesTitle
-            or (
-                self._timecode is not None
-                and other._timecode is not None
-                and self._timecode < other._timecode
-            )
-            or (
-                self._frequency is not None
-                and other._frequency is not None
-                and self._frequency < other._frequency
-            )
+            self._path.parent,
+            self._seriesTitle or '',
+            self.timecode_value(self._timecode) if self._timecode else '',
+            self._frequency or '',
+        ) < (
+            other._path.parent,
+            other._seriesTitle or '',
+            other.timecode_value(other._timecode) if other._timecode else '',
+            other._frequency or '',
         ):
             return True
 
