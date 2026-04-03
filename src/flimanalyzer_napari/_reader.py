@@ -122,6 +122,7 @@ def reader_function(path: str | list[str]):
 
     # load all files from first (only) series into array
     series = next(iter(allSeries.values()))
+    seriesTitle = series.seriesTitle
     seriesData = series.load()
 
     sets = list(seriesData.values())
@@ -135,6 +136,7 @@ def reader_function(path: str | list[str]):
         'Examining set 0 channels: %s',
         set1['data'].keys(),
     )
+    channel_names = list(set1['data'].keys())
     channel1 = next(iter(set1['data'].values()))
     measure_dim = len(channel1)
     log.debug('Examining set 0 measures: %s', channel1.keys())
@@ -142,6 +144,7 @@ def reader_function(path: str | list[str]):
     for t, (time, timeData) in enumerate(seriesData.items()):
         log.debug('Processing time point %s with data %s', t, timeData)
         for c, (channel, channelSet) in enumerate(timeData['data'].items()):
+            log.debug('Processing channel %s with data %s', c, channelSet)
             for m, (measure, measureData) in enumerate(channelSet.items()):
                 log.debug(
                     'Assigning data[%s, %s, %s][%s, %s, %s] => %s',
@@ -158,7 +161,12 @@ def reader_function(path: str | list[str]):
                 data[t, c, m, 0, :, :] = measureData
 
     # optional kwargs for the corresponding viewer.add_* method
-    add_kwargs = {}
+    add_kwargs = {
+        'rgb': False,
+        'channel_axis': 1,
+        'name': [f'{seriesTitle} - {c}' for c in channel_names],
+        'axis_labels': ('time', 'measure', 'z', 'y', 'x'),
+    }
 
     layer_type = 'image'  # optional, default is "image"
     return [(data, add_kwargs, layer_type)]

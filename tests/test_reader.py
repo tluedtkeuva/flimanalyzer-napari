@@ -64,7 +64,7 @@ def create_files(datadir: Path):
 
     # These values should be sorted as we expect the reader to load them
     # so that the images have the right marks.
-    times = ('ctrl', 't10', 't200')
+    times = ('ctrl', 't10', 't20', 't100', 't200')
     channels = ('Ch1', 'Ch2')
     measures = ('a1', 'a1[%]', 'a2', 'chi')
 
@@ -107,7 +107,7 @@ def create_files(datadir: Path):
 
     # create the files
     for i, time in enumerate(times):
-        title = f'a-{time}_800_'
+        title = f'pytest-{time}_800_'
         Path(
             datadir / f'{title}.sdt'
         ).touch()  # create empty .sdt file for each time point
@@ -128,13 +128,6 @@ def create_files(datadir: Path):
                     delimiter=' ',
                     fmt='%0.4f',
                 )
-    # ones = np.ones((array_size, array_size)) / 3
-    # np.savetxt(dir / 'file_1.asc', mark_time(mark_measure(ch1, 0), 0), delimiter=' ', fmt='%0.4f')
-    # np.savetxt(dir / 'file_2.asc', mark_time(mark_measure(ch2, 1), 1), delimiter=' ', fmt='%0.4f')
-    # np.savetxt(dir / 'file_3.asc', mark_time(mark_measure(ch1, 2), 2), delimiter=' ', fmt='%0.4f')
-    # np.savetxt(dir / 'file_4.asc', mark_time(mark_measure(ch2, 3), 3), delimiter=' ', fmt='%0.4f')
-
-    # np.savetxt(dir / 'file_0.asc', np.random.rand(20, 20), delimiter=' ')
 
 
 if __name__ == '__main__':
