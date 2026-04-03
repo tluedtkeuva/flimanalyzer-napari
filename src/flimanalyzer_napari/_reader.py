@@ -78,6 +78,9 @@ def napari_get_reader(path: str | list[str]):
     # return reader_function
 
 
+# TODO: Move file conversion to multidimensional array and metadata from
+# the reader to the FileSeries class, so that it can be reused within
+# pipelines.
 def reader_function(path: str | list[str]):
     """Take a path or list of paths and return a list of LayerData tuples.
 
@@ -140,6 +143,11 @@ def reader_function(path: str | list[str]):
     channel1 = next(iter(set1['data'].values()))
     measure_dim = len(channel1)
     log.debug('Examining set 0 measures: %s', channel1.keys())
+    # TODO: Determine shape from data
+    #   Possibly from SDT file lines:
+    #       #SP [SP_IMG_X,I,256]
+    #       #SP [SP_IMG_Y,I,256]
+    #   Or from the .asc files themselves, which should all have the same shape.
     data = np.zeros((time_dim, channel_dim, measure_dim, 1, 256, 256))
     for t, (time, timeData) in enumerate(seriesData.items()):
         log.warning('Processing time point %s with data %s', t, timeData)
