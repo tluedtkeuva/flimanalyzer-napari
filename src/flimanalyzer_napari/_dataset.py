@@ -255,6 +255,7 @@ class FLIMASCFile(FLIMFile):
             return None
 
     def load(self) -> np.ndarray:
+        # TODO: Check [SP_X_AXIS,I,0] in SDT file to ensure YX ordering.
         return np.loadtxt(self._path, delimiter=' ')
 
     @property
@@ -678,6 +679,67 @@ class FLIMSeries:
         for fset in self._sets:
             data[fset.title] = fset.load()
         return data
+
+    def loadAsTCMZYX(self) -> dict:
+
+        if len(self._sets) == 0:
+            log.warning(
+                'No sets in series %s. Cannot load data.', self.seriesTitle
+            )
+        #     return {'data': np.array([]), 'metadata': {}}
+
+        seriesData = self.load()
+
+        sets = list(seriesData.values())
+        time_dim = len(sets)  # one set per time point
+        # Assume channels and measures are consistent across time points,
+        # so we can determine their dimensions from the first time point's data
+        set1 = sets[0]
+        log.debug('Examining set 0: %s', set1.keys())
+        channel_dim = len(set1['data'])
+        log.debug(
+            'Examining set 0 channels: %s',
+            set1['data'].keys(),
+        )
+        channel_names = list(set1['data'].keys())
+        channel1 = next(iter(set1['data'].values()))
+        measure_dim = len(channel1)
+        log.debug('Examining set 0 measures: %s', channel1.keys())
+        # TODO: Determine shape from data
+        #   Possibly from SDT file lines:
+        #       #SP [SP_IMG_X,I,256]
+        #       #SP [SP_IMG_Y,I,256]
+        #   Or from the .asc files themselves, which should all have the same shape.
+        data = np.zeros((time_dim, channel_dim, measure_dim, 1, 256, 256))
+        for t, (time, timeData) in enumerate(seriesData.items()):
+            log.warning('Processing time point %s with data %s', t, timeData)
+            for c, (channel, channelSet) in enumerate(
+                timeData['data'].items()
+            ):
+                log.debug('Processing channel %s with data %s', c, channelSet)
+                for m, (measure, measureData) in enumerate(channelSet.items()):
+                    log.debug(
+                        'Assigning data[%s, %s, %s][%s, %s, %s] => %s',
+                        t,
+                        c,
+                        m,
+                        time,
+                        channel,
+                        measure,
+                        measureData,
+                    )
+                    # TODO?: Convert t, c, m to the correct indices for the data array based on the structure of the sets and channels
+                    # Maybe add "channel_index" and "measure_index" methods to the FileSet/FileSeries class to help with this?
+                    data[t, c, m, 0, :, :] = measureData
+
+        # TODO: Add metadata from SDT files, e.g. image dimensions, acquisition parameters, etc.
+        seriesData = {
+            'time': list(seriesData.keys()),
+            'channels': channel_names,
+            'measures': list(channel1.keys()),
+        }
+
+        return {'data': data, 'metadata': seriesData}  # TODO: Add metadata
 
     @property
     def sets(self):
