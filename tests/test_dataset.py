@@ -6,7 +6,9 @@ log = logging.getLogger(__name__)
 
 
 def test_sorting(tmp_path):
+    # file names are in expected time sorted order
     files = [
+        'pytest-ctrl_800_-Ch1-_a1[%].asc',
         'pytest-t10_800_-Ch1-_a1[%].asc',
         'pytest-t20_800_-Ch1-_a1[%].asc',
         'pytest-t100_800_-Ch1-_a1[%].asc',
@@ -28,4 +30,4 @@ def test_sorting(tmp_path):
     #  Sorting of sets and series.
 
     assert unsorted_files != asc_files
-    assert sorted(unsorted_files) != asc_files
+    assert sorted(unsorted_files) == asc_files
