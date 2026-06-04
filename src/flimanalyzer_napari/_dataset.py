@@ -1,49 +1,24 @@
 # %%
 # imports
-"""###
-Structure of fitted FLIM datasets
+"""
+Module for handling FLIM (Fluorescence Lifetime Imaging Microscopy) dataset structures.
 
-The fitting process (with proprietary software) produces a series for data files. We care about:
+This module defines classes for representing and manipulating FLIM data files,
+including ASC data files and SDT metadata files.
 
-    *_photons.asc
-    *_chi.asc
-    *_a2[%].asc
-    *_a1[%].asc
-    *_a2.asc
-    *_a1.asc
-    *_t2.asc
-    *_t1.asc
+The FLIM data structure follows this hierarchy:
+- FLIMFile: Abstract base class for FLIM data files
+  - FLIMASCFile: Represents ASC data files containing measurements
+  - FLIMSDTFile: Represents SDT metadata files containing acquisition parameters
+- FLIMSet: A group of FLIM files associated with a single SDT file (same timepoint/frequency)
+- FLIMSeries: A collection of FLIMSet objects sharing the same series title
 
-From an image viewer’s perspective (like Napari) we can consider them as different channels that
-we’d want to treat as different layers that can be overlayed.
-
-There are examples in /standard/siller/Periasamy/fitted_raw_image_data. Note that in a given experiment
-multiple fluorescent molecules may be imaged together. They will be labeled as channels,
-like *_-Ch1-*, *_-Ch2-*, *_-Ch3-*. It is important to keep the channels separate.
-
-Examples:
-
-A Set: (title="a-t80_800_)
-a-t80_800_.sdt
-a-t80_800_-Ch1-_photons.asc     a-t80_800_-Ch2-_photons.asc
-a-t80_800_-Ch3-_photons.asc     a-t80_800_-Ch1-_chi.asc
-a-t80_800_-Ch2-_chi.asc	        a-t80_800_-Ch3-_chi.asc
-a-t80_800_-Ch1-_a2[%].asc	    a-t80_800_-Ch2-_a2[%].asc
-a-t80_800_-Ch3-_a2[%].asc       a-t80_800_-Ch1-_a1[%].asc
-a-t80_800_-Ch2-_a1[%].asc   	a-t80_800_-Ch3-_a1[%].asc
-a-t80_800_-Ch1-_a2.asc	        a-t80_800_-Ch2-_a2.asc
-a-t80_800_-Ch3-_a2.asc          a-t80_800_-Ch1-_a1.asc
-a-t80_800_-Ch2-_a1.asc	        a-t80_800_-Ch3-_a1.asc
-a-t80_800_-Ch1-_t2.asc	        a-t80_800_-Ch2-_t2.asc
-a-t80_800_-Ch3-_t2.asc          a-t80_800_-Ch1-_t1.asc
-a-t80_800_-Ch2-_t1.asc	        a-t80_800_-Ch3-_t1.asc
-
-A Series (just SDT files shown here): (seriesTitle="a-_800_.sdt")
-a-ctrl_800_.sdt     a-t20_800_.sdt      a-t40_800_.sdt
-a-t60_800_.sdt      a-t100_800_.sdt     a-t120_800_.sdt
-a-t140_800_.sdt     a-t160_800_.sdt     a-t180_800_.sdt
-
-###"""
+Typical usage:
+    >>> series = FLIMSeries.series_from_directory('/path/to/flim/data')
+    >>> for series_title, flim_series in series.items():
+    >>>     data = flim_series.loadAsTCMZYX()['data']
+    >>>     # Process the 6D data array (time, channel, measure, z, y, x)
+"""
 
 import logging
 import re
@@ -63,12 +38,18 @@ log.warning(
 
 # %%
 class FLIMFile(ABC):
-    # A single ASC or SDT file
-    # The file is associated with the SDT file by its title,
-    # which is a combination of the timecode and frequency information in the filename.
-    # For example, for the SDT file "a-t80_800_.sdt", the associated ASC files would be those
-    # that start with "a-t80_800_" and have the same timecode and frequency information in
-    # their filenames.
+    """Abstract base class for FLIM (Fluorescence Lifetime Imaging Microscopy) data files.
+
+    This class represents a single FLIM data file (either ASC or SDT) and provides
+    common functionality for parsing file paths, extracting metadata, and comparing files.
+
+    The file is associated with the SDT file by its title,
+    which is a combination of the timecode and frequency information in the filename.
+    For example, for the SDT file "a-t80_800_.sdt", the associated ASC files would be those
+    that start with "a-t80_800_" having the same timecode and frequency information in
+    their filenames.
+
+    """
 
     #
     # Class level defaults common to both SDT and ASC
@@ -76,10 +57,15 @@ class FLIMFile(ABC):
     frequency_re = re.compile(r'(?P<freq>\d+)')
     time_re = re.compile(r'(?P<time>ctrl|t\d+|\d+min)')
 
+    # TODO: should this be more sophisticated? This matches "80", "t20", and "20min"
+    timedigits_re = re.compile(r'^\D*(\d+)\D*$')
+
     # Title may be combination of name, timestamp and frequency, or just a name.
-    # We want to be flexible in what we accept as title, but we want to make sure it doesn't capture the channel or measure information. For simplicity, we can assume that the title is everything before the channel and measure information.
-    # # title_re = re.compile(f"(?P<title>(?:{time_re}|{frequency_re}|[_]|[\\w-]+)+|.+?)")
+    # We want to be flexible in what we accept as title, but we want to make sure it doesn't
+    # capture the channel or measure information. For simplicity, we can assume that the title
+    # is everything before the channel and measure information.
     simple_title_re = re.compile('(?P<title>.+?)')
+    # title_re = re.compile(f"(?P<title>(?:{time_re}|{frequency_re}|[_]|[\\w-]+)+|.+?)")
     title_re = re.compile(
         f'(?P<title>(?:{time_re.pattern}|(?<=_){frequency_re.pattern}|.+?)+)'
     )
@@ -87,6 +73,15 @@ class FLIMFile(ABC):
     def __init__(
         self, path, title, seriesTitle, timecode=None, frequency=None
     ):
+        """Initialize a FLIMFile instance.
+
+        Args:
+            path (Path): Full path to the file
+            title (str): Base title of the file (timecode + frequency info)
+            seriesTitle (str): Series identifier (title without timecode)
+            timecode (str, optional): Timepoint identifier (e.g., 'ctrl', 't20')
+            frequency (str, optional): Laser frequency identifier (e.g., '800')
+        """
         self._path = path
         self._title = title
         self._seriesTitle = seriesTitle
@@ -98,30 +93,47 @@ class FLIMFile(ABC):
     def parsePath(
         cls, path, pathRegex=None, titleRegex=None
     ) -> 'FLIMFile|None':
-        pass
+        """Parse a file path to identify FLIM files and extract filename metadata.
+
+        Args:
+            path (Path): File path to parse
+            pathRegex (Pattern, optional): Regex pattern to match against filename
+            titleRegex (Pattern, optional): Regex pattern to extract timecode/frequency
+
+        Returns:
+            FLIMFile|None: Parsed FLIM file object or None if path doesn't match expected pattern
+        """
 
     @abstractmethod
     def load(self) -> object:
-        pass
+        """Load the data from the associated file.
 
-    @staticmethod
-    def timecode_value(timecode: str) -> int | str | None:
+        Returns:
+            object: The loaded data, determined by the file type, e.g. numeric array for ASC files,
+            metadata dictionary for SDT files.
+        """
+
+    @classmethod
+    def timecode_value(cls, timecode: str) -> int | str | None:
+        """Convert a timecode string to a numerical value for sorting.
+
+        Special handling for 'ctrl' (returns -1) and numeric timecodes.
+        For formats like 't20', returns 20. For plain numbers, returns the number.
+        If timecode cannot be parsed as a number, returns the original string.
+
+        Args:
+            timecode (str): Timecode string (e.g., 'ctrl', 't20', '20min')
+
+        Returns:
+            int|str|None: Numerical value for sorting, or None if input is None
+        """
         if timecode is None:
             return None
 
         if timecode == 'ctrl':
             return -1
 
-        # match most common timecode format of t10, t20, etc.
-        if timecode.startswith('t'):
-            return int(timecode[1:])
-
-        # match leading or trailing digits
-        r = re.match(r'^(\d+)', timecode)
-        if r:
-            return int(r.group(1))
-
-        r = re.match(r'(\d+)$', timecode)
+        r = cls.timedigits_re.match(timecode)
         if r:
             return int(r.group(1))
 
@@ -130,25 +142,30 @@ class FLIMFile(ABC):
 
     @property
     def path(self) -> Path:
+        """Return the file path associated with this FLIMFile."""
         return self._path
 
     @property
     def title(self) -> str | None:
+        """Return the title associated with this FLIMFile."""
         return self._title
 
     @property
     def seriesTitle(self) -> str | None:
+        """Return the series title associated with this FLIMFile."""
         return self._seriesTitle
 
     @property
     def timecode(self) -> str | None:
+        """Return the timecode associated with this FLIMFile."""
         return self._timecode
 
     @property
     def frequency(self) -> str | None:
+        """Return the laser frequency associated with this FLIMFile."""
         return self._frequency
 
-    # TODO: implement lt and eq for sorting (time/channel/measure order)
+    # TODO: Implemented lt and eq for sorting (time/channel/measure order).
     #       Does this break equality? Consider same filename in different directory!
     def __lt__(self, other) -> bool:
         if not isinstance(other, FLIMFile):
@@ -184,6 +201,19 @@ class FLIMFile(ABC):
 
 
 class FLIMASCFile(FLIMFile):
+    """Represents an ASC data file containing FLIM measurement data.
+
+    ASC files contain the actual measurement data for different FLIM parameters
+    such as photon counts, chi-squared values, amplitude percentages, and lifetimes.
+
+    Class Attributes:
+        measures (list): List of valid measurement types in the files
+        measures_re (Pattern): Regex pattern to extract measure type from filename
+        channel_re (Pattern): Regex pattern to extract channel identifier from filename
+        asc_regex (Pattern): Compiled regex for parsing ASC file paths
+
+    """
+
     #
     # Class level defaults specific to ASC
     #
@@ -217,10 +247,24 @@ class FLIMASCFile(FLIMFile):
         channel=None,
         measure=None,
     ):
+        """Initialize a FLIMASCFile instance.
+
+        Args:
+            path (Path): Path object pointing to the ASC file
+            setTitle (str): Base title of the file (timecode + frequency info)
+            seriesTitle (str): Series identifier (title without timecode)
+            timecode (str, optional): Timepoint identifier (e.g., 'ctrl', 't20')
+            frequency (str, optional): Laser frequency identifier (e.g., '800')
+            channel (str, optional): Channel identifier (e.g., 'Ch1', 'Ch2')
+            measure (str, optional): Measurement type (e.g., 'photons', 'chi', 'a2[%]')
+        """
         super().__init__(path, setTitle, seriesTitle, timecode, frequency)
         self._channel = channel
         self._measure = measure
 
+    # TODO: Allow for overriding regex patters specific to ASC files.
+    #       Consider using a subclass of FLIMFile or passing regex patterns as arguments to the constructor.
+    #       How would we do that within Napari using the reader?
     @classmethod
     def parsePath(
         cls, path, pathRegex=None, titleRegex=None
@@ -256,20 +300,24 @@ class FLIMASCFile(FLIMFile):
 
     def load(self) -> np.ndarray:
         # TODO: Check [SP_X_AXIS,I,0] in SDT file to ensure YX ordering.
+        #       Check [] in SDT file to ensure shape (assuming 256x256).
         return np.loadtxt(self._path, delimiter=' ')
 
     @property
     def channel(self) -> str | None:
+        """Return the channel identifier associated with this FLIMASCFile."""
         return self._channel
 
     @property
     def measure(self) -> str | None:
+        """Return the measurement type associated with this FLIMASCFile."""
         return self._measure
 
-    # TODO: implement lt and eq for sorting (time/channel/measure order)
+    # TODO: Implemented lt and eq for sorting (time/channel/measure order).
     #       Does this break equality? Consider same filename in different directory!
+    #       Consider pushing common comparisons to FLIMFile?
     def __lt__(self, other) -> bool:
-        if not isinstance(other, FLIMASCFile):
+        if not isinstance(other, FLIMFile):
             return NotImplemented
 
         # Compare using tuple for lexicographical order, treating None as empty string for sorting
@@ -289,7 +337,7 @@ class FLIMASCFile(FLIMFile):
         if isinstance(other, FLIMSDTFile):
             return False  # ASC files should come after matching SDT file
 
-        if (  # noqa: SIM103
+        if isinstance(other, FLIMASCFile) and (  # noqa: SIM103
             self._channel or '',
             self._measure or '',
             self.path.name,
@@ -300,6 +348,14 @@ class FLIMASCFile(FLIMFile):
 
 
 class FLIMSDTFile(FLIMFile):
+    """Represents an SDT data file containing FLIM measurement data.
+
+    SDT files contain configuration for acquisition and FLIM parameters. Common to
+    a set of ASC files, such as photon counts, chi-squared values, amplitude
+    percentages, and lifetimes.
+
+    """
+
     sdt_regex = re.compile(
         f"""
         {FLIMFile.simple_title_re.pattern}          # Title
@@ -353,6 +409,8 @@ class FLIMSDTFile(FLIMFile):
         else:
             return None
 
+    # TODO: Pick out  useful information for validation elsewhere (e.g. timestamp,
+    #       acquisition parameters, image dimensions, etc.)
     def load(self) -> dict:
         sdt_data = {}
         try:
@@ -424,18 +482,20 @@ class FLIMSDTFile(FLIMFile):
 
 
 class FLIMSet:
-    # A set of files associated with a single SDT file.
-    # The files are associated with the SDT file by their title,
-    # which is a combination of the timecode and frequency information in the filename.
-    # For example, for the SDT file "a-t80_800_.sdt", the associated files would be those
-    # that start with "a-t80_800_" and have the same timecode and frequency information in
-    # their filenames.
-    #
-    # Following OME's default ordering, XYZCT.
+    """
+    A set of files associated with a single SDT file.
+    The files are associated with the SDT file by their title,
+    which is a combination of the timecode and frequency information in the filename.
+    For example, for the SDT file "a-t80_800_.sdt", the associated files would be those
+    that start with "a-t80_800_" and have the same timecode and frequency information in
+    their filenames.
 
-    # Structure of data for ASC files:
-    #   {Path(file): {channel: str, measure: str}}
-    #
+    Following default ordering,  XYZCT.
+
+    Structure of data for ASC files:
+      {Path(file): {channel: str, measure: str}}
+    """
+
     def __init__(
         self,
         files: list[FLIMASCFile],
@@ -443,6 +503,15 @@ class FLIMSet:
         ignore_missing_files: bool = False,
         ignore_missing_sdt: bool = False,
     ):
+        """
+        Initialize a FLIMSet instance.
+
+        Args:
+            files (list[FLIMASCFile]): List of ASC files
+            sdt (FLIMSDTFile | None): Associated SDT file
+            ignore_missing_files (bool): Whether to ignore missing files
+            ignore_missing_sdt (bool): Whether to ignore missing SDT file
+        """
         # log.debug(
         #     'Creating FLIMSet with files: %s and sdt: %s',
         #     files,
@@ -499,9 +568,6 @@ class FLIMSet:
                 f'Dataset {self.title} has no sdt file.'
             )
 
-    # TODO: Does it make sense to load data here, or
-    # should the file loader walk through the series/sets to create the stacked image?
-    # Ditto for FLIMSeries
     def load(self) -> dict:
         """
         Load FLIMSet data
@@ -537,9 +603,14 @@ class FLIMSet:
     def channels(self):
         return self._channels
 
-    # @property
-    # def measures(self):
-    #     return self._measures
+    # TODO: Should we return measures per channel, assume all channels have the same measures,
+    #       and if so, should we check for consistency across channels?
+    @property
+    def measures(self):
+        measures = set()
+        for channel in self._channels.values():
+            measures.update(channel.keys())
+        return sorted(measures)
 
     @property
     def timecode(self):
@@ -583,9 +654,16 @@ class FLIMSeries:
     # For example, for the SDT file "a-t80_800_.sdt", the associated files would be those
     # that start with "a-t80_800_" and have the same  frequency information in
     # their filenames. The timecode information can vary across the files in the series,
-    # e.g. "a-t80_800_" and "a-t100_800_.asc" would both be associated with the same series.
+    # e.g. "a-t80_800_.sdt" and "a-t100_800_.sdt" would both be associated with the same series.
 
     def __init__(self, sets: list[FLIMSet]):
+        """
+        Initialize a FLIMSeries instance.
+
+        Args:
+            sets (list[FLIMSet]): A list of FLIMSet instances.
+        """
+        # TODO: add checks for consistency of series title and frequency across sets.
         self._sets = sorted(sets)
         if len(sets) == 0:
             self._seriesTitle = None
@@ -602,10 +680,21 @@ class FLIMSeries:
         ignore_missing_files=False,
         ignore_missing_sdt=False,
     ) -> 'dict[str,FLIMSeries]':
+        """
+        Create a list of FLIMSeries objects by:
+            Scan directory for files, group by title, extract timecodes,
+            Create FileSet objects and store them in a FileSeries object.
+            Return a list of FileSeries objects containing the grouped FileSet objects
+        Args:
+            dirpath (str or Path): The directory path to scan for FLIM files.
+            glob (str, optional): A glob pattern to filter files. Defaults to None, which means all files.
+            recursive (bool, optional): Whether to scan directories recursively. Defaults to True.
+            ignore_missing_files (bool, optional): Whether to ignore missing files when creating FLIMSet objects. Defaults to False.
+            ignore_missing_sdt (bool, optional): Whether to ignore missing SDT files when creating FLIMSet objects. Defaults to False.
 
-        # Scan directory for files, group by title, extract timecodes,
-        # create FileSet objects and store them in a FileSeries object.
-        # Return a list of FileSeries objects containing the grouped FileSet objects
+        Returns:
+            dict[str, FLIMSeries]: A dictionary mapping series titles to FLIMSeries objects.
+        """
         allFiles = {}
         for path in dirpath.glob(
             glob if glob is not None else '**/*' if recursive else '*'
@@ -675,13 +764,21 @@ class FLIMSeries:
         return allSeries
 
     def load(self) -> dict:
+        """
+        Load FLIMSeries data into a dictionary of title -> data, where data is a dictionary containing
+        the loaded data from the associated FLIMSet objects.
+        """
         data = {}
         for fset in self._sets:
             data[fset.title] = fset.load()
         return data
 
     def loadAsTCMZYX(self) -> dict:
-
+        """
+        Load FLIMSeries data into a dictionary of data and metadata.
+        The data is returned as a 6D numpy array with dimensions corresponding to time, channel, measure, z, y, x.
+        The metadata is returned as a dictionary containing the time points, channel names, and measure names
+        """
         if len(self._sets) == 0:
             log.warning(
                 'No sets in series %s. Cannot load data.', self.seriesTitle
@@ -742,8 +839,7 @@ class FLIMSeries:
         return {'data': data, 'metadata': seriesData}  # TODO: Add metadata
 
     @property
-    def sets(self):
-
+    def sets(self) -> list[FLIMSet]:
         return self._sets
 
     @property

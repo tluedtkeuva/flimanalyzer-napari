@@ -9,48 +9,48 @@ contributions:
     - id: flimanalyzer-napari.get_reader
       python_name: flimanalyzer_napari._reader:napari_get_reader
       title: Open data with FLIMAnalyzer
-    - id: flimanalyzer-napari.write_multiple
-      python_name: flimanalyzer_napari._writer:write_multiple
-      title: Save multi-layer data with FLIMAnalyzer
-    - id: flimanalyzer-napari.write_single_image
-      python_name: flimanalyzer_napari._writer:write_single_image
-      title: Save image data with FLIMAnalyzer
-    - id: flimanalyzer-napari.make_container_widget
-      python_name: flimanalyzer_napari:ImageThreshold
-      title: Make threshold Container widget
-    - id: flimanalyzer-napari.make_magic_widget
-      python_name: flimanalyzer_napari:threshold_magic_widget
-      title: Make threshold magic widget
-    - id: flimanalyzer-napari.make_function_widget
-      python_name: flimanalyzer_napari:threshold_autogenerate_widget
-      title: Make threshold function widget
-    - id: flimanalyzer-napari.make_qwidget
-      python_name: flimanalyzer_napari:ExampleQWidget
-      title: Make example QWidget
+    # - id: flimanalyzer-napari.write_multiple
+    #   python_name: flimanalyzer_napari._writer:write_multiple
+    #   title: Save multi-layer data with FLIMAnalyzer
+    # - id: flimanalyzer-napari.write_single_image
+    #   python_name: flimanalyzer_napari._writer:write_single_image
+    #   title: Save image data with FLIMAnalyzer
+    # - id: flimanalyzer-napari.make_container_widget
+    #   python_name: flimanalyzer_napari:ImageThreshold
+    #   title: Make threshold Container widget
+    # - id: flimanalyzer-napari.make_magic_widget
+    #   python_name: flimanalyzer_napari:threshold_magic_widget
+    #   title: Make threshold magic widget
+    # - id: flimanalyzer-napari.make_function_widget
+    #   python_name: flimanalyzer_napari:threshold_autogenerate_widget
+    #   title: Make threshold function widget
+    # - id: flimanalyzer-napari.make_qwidget
+    #   python_name: flimanalyzer_napari:ExampleQWidget
+    #   title: Make example QWidget
   readers:
     - command: flimanalyzer-napari.get_reader
       accepts_directories: true
       filename_patterns: ['*.sdt','*.asc']
-  writers:
-    - command: flimanalyzer-napari.write_multiple
-      layer_types: ['image*','labels*']
-      filename_extensions: []
-    - command: flimanalyzer-napari.write_single_image
-      layer_types: ['image']
-      filename_extensions: ['.tif']
-  widgets:
-    - command: flimanalyzer-napari.make_container_widget
-      display_name: Container Threshold
-    - command: flimanalyzer-napari.make_magic_widget
-      display_name: Magic Threshold
-    - command: flimanalyzer-napari.make_function_widget
-      autogenerate: true
-      display_name: Autogenerate Threshold
-    - command: flimanalyzer-napari.make_qwidget
-      display_name: Example QWidget
-  menus:
-    napari/layers/segment:
-      - command: flimanalyzer-napari.make_container_widget
-      - command: flimanalyzer-napari.make_magic_widget
-      - command: flimanalyzer-napari.make_function_widget
-      - command: flimanalyzer-napari.make_qwidget
+  # writers:
+  #   - command: flimanalyzer-napari.write_multiple
+  #     layer_types: ['image*','labels*']
+  #     filename_extensions: []
+  #   - command: flimanalyzer-napari.write_single_image
+  #     layer_types: ['image']
+  #     filename_extensions: ['.tif']
+  # widgets:
+  #   - command: flimanalyzer-napari.make_container_widget
+  #     display_name: Container Threshold
+  #   - command: flimanalyzer-napari.make_magic_widget
+  #     display_name: Magic Threshold
+  #   - command: flimanalyzer-napari.make_function_widget
+  #     autogenerate: true
+  #     display_name: Autogenerate Threshold
+  #   - command: flimanalyzer-napari.make_qwidget
+  #     display_name: Example QWidget
+  # menus:
+  #   napari/layers/segment:
+  #     - command: flimanalyzer-napari.make_container_widget
+  #     - command: flimanalyzer-napari.make_magic_widget
+  #     - command: flimanalyzer-napari.make_function_widget
+  #     - command: flimanalyzer-napari.make_qwidget
